@@ -1,7 +1,6 @@
 from __future__ import annotations
-
 from typing import Iterable
-
+from pybeat.utils.http import HTTPClient
 from .exceptions import InvalidQuery, ProviderError
 from .models import Track
 
