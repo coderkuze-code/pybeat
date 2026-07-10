@@ -1,26 +1,75 @@
-from .utils.http import HTTPClient
-from .providers.youtube import YouTubeProvider
+from __future__ import annotations
+
+from typing import Iterable
+
+from .exceptions import InvalidQuery, ProviderError
+from .models import Track
 
 
 class Client:
 
-    def __init__(self):
-        self.http = HTTPClient()
+    def __init__(self) -> None:
+        self._providers = []
 
-        self.providers = [
-            YouTubeProvider(self.http)
-        ]
+    @property
+    def providers(self):
+        return tuple(self._providers)
 
-    async def search(self, query: str):
+    def register(self, provider) -> None:
+
+        if provider in self._providers:
+            return
+
+        self._providers.append(provider)
+
+    def unregister(self, provider) -> None:
+
+        if provider in self._providers:
+            self._providers.remove(provider)
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[Track]:
+
+        if not query.strip():
+            raise InvalidQuery("Query cannot be empty.")
+
         results = []
 
-        for provider in self.providers:
+        for provider in self._providers:
             try:
-                results.extend(await provider.search(query))
-            except Exception:
-                pass
+                tracks = await provider.search(
+                    query=query,
+                    limit=limit,
+                )
 
-        return results
+                if tracks:
+                    results.extend(tracks)
+
+            except Exception as e:
+                raise ProviderError(
+                    f"{provider.name}: {e}"
+                ) from e
+
+        return results[:limit]
 
     async def close(self):
-        await self.http.close()
+
+        for provider in self._providers:
+            close = getattr(provider, "close", None)
+
+            if callable(close):
+                await close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type,
+        exc,
+        tb,
+    ):
+        await self.close()
