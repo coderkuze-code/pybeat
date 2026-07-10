@@ -1,10 +1,14 @@
+from .utils.http import HTTPClient
 from .providers.youtube import YouTubeProvider
 
 
 class Client:
+
     def __init__(self):
+        self.http = HTTPClient()
+
         self.providers = [
-            YouTubeProvider()
+            YouTubeProvider(self.http)
         ]
 
     async def search(self, query: str):
@@ -14,6 +18,9 @@ class Client:
             try:
                 results.extend(await provider.search(query))
             except Exception:
-                continue
+                pass
 
         return results
+
+    async def close(self):
+        await self.http.close()
